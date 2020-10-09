@@ -28,18 +28,12 @@ def hello_http(request):
 
     selenium_driver = initialize_driver()
     # japatalk_login(selenium_driver, 'jopetor2@gmail.com', '1q2w3e4r')
-
-    reservation_confirm_function = ''.join([
-        '<script>',
-            'function moveWithReserveInfoDay(script, date, hour, minutes, teacherId) {', 
-                'window.location.replace(window.location.href', 
-                '?date=date&hour=hour&minutes=minutes&teacherId=teacherId)',
-            '}', 
-        '</script>'])
         
+    script = '<script>function moveWithReserveInfoDay(script, date, hour, minutes, teacherId) {'+ "console.log('yey')" + "window.location.replace(window.location.href + '?date='+date+'&hour='+hour+'&minutes='+minutes+'&teacherId='+teacherId)}</script>"
+
 # javascript:moveWithReserveInfoDay('reservation_confirm.php', '2020-10-16', 9, 0, 1202);
     # availables = 
-    header = '<html><head>'+reservation_confirm_function+'<link href="css/souppot.css" rel="stylesheet"><link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet"/><link href="https://www.japatalk.com/css/souppot.css" rel="stylesheet"><link href="https://www.japatalk.com/css/style.css" rel="stylesheet"><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script><link rel="stylesheet" type="text/css" href="https://www.japatalk.com/js/slick/slick.css"><link rel="stylesheet" type="text/css" href="https://www.japatalk.com/js/slick/slick-theme.css"><link rel="stylesheet" type="text/css" href="https://www.japatalk.com/js/bxslider/jquery.bxslider.css"></head><body><div id="main"><div class="container schedule">'
+    header = '<html><head>'+script+'<link href="css/souppot.css" rel="stylesheet"><link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet"/><link href="https://www.japatalk.com/css/souppot.css" rel="stylesheet"><link href="https://www.japatalk.com/css/style.css" rel="stylesheet"><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script><link rel="stylesheet" type="text/css" href="https://www.japatalk.com/js/slick/slick.css"><link rel="stylesheet" type="text/css" href="https://www.japatalk.com/js/slick/slick-theme.css"><link rel="stylesheet" type="text/css" href="https://www.japatalk.com/js/bxslider/jquery.bxslider.css"></script></head><body><div id="main"><div class="container schedule">'
 
     table = get_teacher_page(selenium_driver, email, password)
     # [print(available) for available in availables]
@@ -56,7 +50,8 @@ def hello_http(request):
     # selenium_driver.execute_script("javascript:void(0);")
     html = header + table + '</div></div></body></html>'
 
-    print(html)
+    html = html.replace('javascript:moveWithReserveInfoDay(', 'moveWithReserveInfoDay(')
+
     return html
 
 def initialize_driver():
