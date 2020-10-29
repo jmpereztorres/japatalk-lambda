@@ -1,0 +1,14 @@
+{
+  "name": "poc-node-lambda",
+  "version": "1.0.0",
+  "description": "Google home page automated test ",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=japatalk"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^1.7.1",
+    "cheerio": "^1.0.0-rc.3",
+    "request": "^2.88.2"
+  }
+}
