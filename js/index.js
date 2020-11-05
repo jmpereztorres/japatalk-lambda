@@ -100,6 +100,43 @@ async function viewTeacherPageStandalone(teacherId, cookie) {
 
 }
 
+function notifyByEmail(){
+  console.log('notifying')
+  let body = {
+    "personalizations": [
+        {
+            "to": [
+                { "email": "jopetor2@gmail.com", "name": "Jose" },
+                { "email": "patricioon@hotmail.com", "name": "Patricioon" },
+                { "email": "barruuu@gmail.com", "name": "rara" },
+                { "email": "u2002994@gmail.com", "name": "Dani" }
+            ],
+            "dynamic_template_data": {
+                "content":{
+                    "redirect_url": "https://asia-northeast1-cycles-265707.cloudfunctions.net/poc-node-function",
+                    "custom_message": "Hay clases nuevas con Non (teacher id: 1202)",
+                    "redirect_message": "Ver horario"
+                },
+                "customer": "Ebrios patanes del jurado",
+                "subject": "[CYBERDYNE][CYCLES] Japatalk notification"
+            }
+        }
+    ],
+    "template_id": "d-800cd277605d49839336cdc5dac25810",
+    "from": {
+        "email": "noreply@cyberdyne.jp",
+        "name": "Cyberdyne"
+    }
+  }
+  request.post('https://api.sendgrid.com/v3/mail/send', {
+    body: JSON.stringify(body),
+   
+    (err, res, body) => {
+      console.log('Notified')
+    }
+  );
+}
+
 function scrapLastTimestamp(page){
   let html = $.load(page);
   let timestampTag = html('.koma.open').last().attr('onclick').replace(/'/g, '').replace(/"/g, '').split(',').splice(1, 1).pop().trim();
