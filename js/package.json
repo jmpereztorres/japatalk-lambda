@@ -7,6 +7,7 @@
     "start": "functions-framework --target=japatalk"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^5.4.0",
     "@google-cloud/functions-framework": "^1.7.1",
     "cheerio": "^1.0.0-rc.3",
     "request": "^2.88.2"

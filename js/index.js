@@ -1,5 +1,6 @@
 const request = require('request');
 const $ = require('cheerio');
+const {BigQuery} = require('@google-cloud/bigquery');
 
 exports.japatalk = async (req, res) => {
 
@@ -10,23 +11,37 @@ exports.japatalk = async (req, res) => {
   let minutes = req.query.minutes;
   let teacherId = req.query.teacherId | 1202;
 
+  let stored;
+
   let cookie;
   let page;
 
   if(email && password){
-    console.log('get cookie')
     cookie = await loginStandalone(email, password).then(s=> s[0]);
   }
 
   console.log(`cookie: ${cookie}`)
 
   if(date && hour && minutes && teacherId){
-    console.log('Book')
     page = await bookClassFinishStandalone(date, hour, minutes, teacherId, cookie);
   }
    
-  console.log('teacher page')
   page = await viewTeacherPageStandalone(teacherId, cookie).then(s=> s);
+
+  console.log('page loaded')
+
+  // await storeTimestamp(page, teacherId).then(s=> stored = s);
+  lastTimestamp = await getTeacherLastTimestamp(teacherId);
+  timestamp = scrapLastTimestamp(page);
+
+  console.log(`last: ${lastTimestamp} (${typeof lastTimestamp}), current: ${timestamp} (${typeof timestamp})`)
+  console.log(`${lastTimestamp < timestamp}`)
+  if (!lastTimestamp){
+    storeTimestamp(timestamp, teacherId, 'CREATE');
+  } else if(lastTimestamp < timestamp){
+    storeTimestamp(timestamp, teacherId, 'REPLACE');
+    notifyByEmail();
+  }
 
   res.status(200).send(page);
 }
@@ -46,6 +61,22 @@ async function loginStandalone(email, password){
   });
 }
 
+async function getTeacherLastTimestamp(teacherId){
+  const bigquery = new BigQuery();
+
+  const options = {
+    query: `SELECT timestamp FROM \`cycles-265707.talktalk.timestamp\` where code = @code order by timestamp desc LIMIT 1`,
+    params: {code: teacherId},
+    location: 'asia-northeast1'
+  };
+
+  const [job] = await bigquery.createQueryJob(options);
+  console.log(`Job ${job.id} started.`);
+  
+  const [rows] = await job.getQueryResults();
+  return rows[0] ? new Date(rows[0].timestamp.value): undefined;
+}
+
 async function viewTeacherPageStandalone(teacherId, cookie) {
   let options = {
     headers: { 'Cookie': cookie }
@@ -54,26 +85,46 @@ async function viewTeacherPageStandalone(teacherId, cookie) {
     request.get(`https://www.japatalk.com/staff_detail_0000${teacherId}.php`, options,
       (err, res, body) => {
         let html = $.load(res.body);
-        let script = '<script>function moveWithReserveInfoDay(script, date, hour, minutes, teacherId) { window.location.replace(`${window.location.href}?date=${date}&hour=${hour}&minutes=${minutes}&teacherId=${teacherId}&email=${document.getElementById("email").value}&password=${document.getElementById("pass").value}&teacherId=${document.getElementById("teacherId").value}`)}</script>'
-        let inputs = "<label>Email:</label><input type='text' id='email' /><label>Password:</label><input type='password' id='pass' /><label>TeacherId:</label><input type='number' id='teacherId' />";
+        let script = '<script>function moveWithReserveInfoDay(script, date, hour, minutes, teacherId) { window.location.replace(`${window.location.href.split("?")[0]}?date=${date}&hour=${hour}&minutes=${minutes}&teacherId=${teacherId}&email=${document.getElementById("email").value}&password=${document.getElementById("pass").value}&teacherId=${document.getElementById("teacherId").value}`)}</script>'
+        let inputs = "<label>Email:</label><input type='text' id='email'/><label>Password:</label><input type='password' id='pass' /><label>TeacherId:</label><input type='number' id='teacherId'/>";
 
         let head = html('head').html().replace('<script type="text/javascript" src="./js/tools.js?1605231000"></script>', script);
         let table = html('.cal-table').parent().html().replace(/javascript:moveWithReserveInfoDay\(/g, 'moveWithReserveInfoDay(');
-        resolve(`<html><head>${head}</head><body><div id="main"><div class="container schedule">${inputs}${table}</div></div></body></html>`);
+
+        let updatedHtml = `<html><head>${head}</head><body>${script}<div id="main"><div class="container schedule">${inputs}${table}</div></div></body></html>`
+
+        resolve(updatedHtml);
       }
     )
   });
+
 }
 
-async function bookClassStandalone(date, hour, minutes, teacherId, cookie){
-  return new Promise((resolve, reject) => {
-    request.post(`https://www.japatalk.com/reservation_confirm.php`,
-      { form: { sty: `0000${teacherId}`, vHour: hour, vMinute: minutes, vStaffCD: teacherId, vDate: date, vStaff: 1 }, headers: { 'Cookie': cookie } },
-      (err, res, body) => {
-        resolve(res.body);
-      }
-    )
-  });
+function scrapLastTimestamp(page){
+  let html = $.load(page);
+  let timestampTag = html('.koma.open').last().attr('onclick').replace(/'/g, '').replace(/"/g, '').split(',').splice(1, 1).pop().trim();
+  return new Date(timestampTag)
+}
+
+function storeTimestamp(timestamp, teacherId, action){
+  const bigquery = new BigQuery();
+
+  if(action == 'CREATE'){
+    const options = {
+      query: `INSERT INTO \`cycles-265707.talktalk.timestamp\` (code, timestamp) VALUES (@code, @timestamp)`,
+      params: {code: teacherId, timestamp: timestamp},
+      location: 'asia-northeast1'
+    };
+
+    bigquery.query(options);
+  } else if(action == 'REPLACE'){
+    const options = {
+      query: `UPDATE \`cycles-265707.talktalk.timestamp\` SET timestamp = @timestamp WHERE code = @code`,
+      params: {code: teacherId, timestamp: timestamp},
+      location: 'asia-northeast1'
+    };
+    bigquery.query(options);
+  }
 }
 
 async function bookClassFinishStandalone(date, hour, minutes, teacherId, cookie){
@@ -87,18 +138,3 @@ async function bookClassFinishStandalone(date, hour, minutes, teacherId, cookie)
     )
   });
 }
-
-//   sty: 00001202
-// vHour: 20
-// vMinute: 30
-// vStaffCD: 1202
-// vDate: 2020-11-12
-// vThisMonth: 2020/10/01
-// vStaff: 1
-// vSearchMode: 
-// Reservation_wTimeFrom: 2020-11-12 20:30:00
-// Reservation_wStaffCD: 1202
-// work: 
-// vConfirm: 
-// editReservationCD: 
-// _r_e_l_o_a_d_: cab81a939e5b25d221ccdec11c465ea0
